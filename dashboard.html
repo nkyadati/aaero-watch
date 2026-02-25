@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Aero-Watch — Pipeline Results</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@400;500;700&family=Fraunces:opsz,wght@9..144,400;9..144,700&display=swap');
+
+  * { margin:0; padding:0; box-sizing:border-box; }
+
+  :root {
+    --bg: #0a0f0d; --card: #111916; --border: #1e2e24;
+    --accent: #4ade80; --accent-dim: #22543d;
+    --danger: #ef4444; --danger-dim: #7f1d1d;
+    --warn: #f59e0b;
+    --text: #e8efe9; --muted: #7a9480; --dim: #3d5443;
+  }
+
+  body {
+    background: var(--bg); color: var(--text);
+    font-family: 'DM Sans', sans-serif; min-height: 100vh;
+  }
+
+  .header {
+    padding: 16px 28px; border-bottom: 1px solid var(--border);
+    display: flex; justify-content: space-between; align-items: center;
+    background: rgba(17,25,22,0.9);
+  }
+  .header h1 {
+    font-family: 'Fraunces', serif; font-size: 22px; font-weight: 900;
+    color: var(--accent); letter-spacing: -0.5px;
+  }
+  .header .sub {
+    font-family: 'DM Mono', monospace; font-size: 12px; color: var(--muted);
+    letter-spacing: 1px; margin-left: 12px;
+  }
+  .header .right {
+    font-family: 'DM Mono', monospace; font-size: 11px; color: var(--muted);
+  }
+
+  .container { padding: 20px 28px; display: flex; flex-direction: column; gap: 20px; }
+
+  /* Upload zone */
+  .upload-zone {
+    border: 2px dashed var(--border); border-radius: 12px; padding: 40px;
+    text-align: center; cursor: pointer; transition: border-color 0.2s;
+  }
+  .upload-zone:hover { border-color: var(--accent); }
+  .upload-zone.active { border-color: var(--accent); background: rgba(74,222,128,0.05); }
+  .upload-zone h2 {
+    font-family: 'Fraunces', serif; font-size: 20px; color: var(--text); margin-bottom: 8px;
+  }
+  .upload-zone p { font-family: 'DM Mono', monospace; font-size: 12px; color: var(--muted); }
+  .upload-zone code {
+    display: inline-block; margin-top: 12px; padding: 8px 16px;
+    background: var(--card); border: 1px solid var(--border); border-radius: 6px;
+    font-family: 'DM Mono', monospace; font-size: 11px; color: var(--accent);
+  }
+
+  /* Stats row */
+  .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+  .stat {
+    background: var(--card); border: 1px solid var(--border); border-radius: 8px;
+    padding: 16px 20px; position: relative;
+  }
+  .stat .label {
+    font-family: 'DM Mono', monospace; font-size: 11px; text-transform: uppercase;
+    letter-spacing: 1.5px; color: var(--muted); margin-bottom: 6px;
+  }
+  .stat .value {
+    font-family: 'Fraunces', serif; font-size: 32px; font-weight: 700; line-height: 1;
+  }
+  .stat .sub {
+    font-family: 'DM Mono', monospace; font-size: 12px; color: var(--muted); margin-top: 4px;
+  }
+
+  /* Grid */
+  .grid { display: grid; grid-template-columns: 2fr 1fr; gap: 16px; }
+  .panel {
+    background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 16px;
+  }
+  .panel-title {
+    font-family: 'DM Mono', monospace; font-size: 11px; text-transform: uppercase;
+    letter-spacing: 1.5px; color: var(--muted); margin-bottom: 12px;
+  }
+
+  /* Table */
+  .table-header, .table-row {
+    display: grid; grid-template-columns: 2fr 60px 60px 80px 60px;
+    gap: 8px; padding: 8px 12px; font-family: 'DM Mono', monospace; font-size: 12px;
+    align-items: center;
+  }
+  .table-header {
+    font-size: 10px; color: var(--dim); text-transform: uppercase; letter-spacing: 0.5px;
+    border-bottom: 1px solid var(--border);
+  }
+  .table-row { border-bottom: 1px solid var(--border); }
+  .table-row.black-row { background: rgba(127,29,29,0.15); }
+  .table-body { max-height: 300px; overflow-y: auto; }
+
+  .dot {
+    width: 8px; height: 8px; border-radius: 50%; display: inline-block;
+    border: 1px solid #444; margin-right: 4px; vertical-align: middle;
+  }
+
+  .conf-high { color: var(--accent); }
+  .conf-mid { color: var(--warn); }
+  .conf-low { color: var(--danger); }
+
+  /* Colour list */
+  .color-row {
+    display: flex; align-items: center; gap: 8px; margin-bottom: 6px;
+    font-family: 'DM Mono', monospace; font-size: 12px;
+  }
+  .color-bar {
+    height: 16px; border-radius: 3px; min-width: 4px; transition: width 0.5s ease;
+  }
+
+  .footer {
+    text-align: center; padding: 8px 0; font-size: 10px; color: var(--dim);
+    font-family: 'DM Mono', monospace;
+  }
+
+  .hidden { display: none; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div style="display:flex;align-items:baseline">
+    <h1>◉ AERO-WATCH</h1>
+    <span class="sub">PIPELINE RESULTS</span>
+  </div>
+  <div class="right">YOLO26x + DINOv2 ViT-S/14</div>
+</div>
+
+<div class="container">
+
+  <!-- Upload Zone (shown when no data loaded) -->
+  <div id="upload-zone" class="upload-zone" onclick="document.getElementById('file-input').click()">
+    <h2>Load Pipeline Results</h2>
+    <p>Drag & drop pipeline_results.json here, or click to browse</p>
+    <code>python3 run_pipeline.py -i ./images/ --color-model color_classifier_best.pt --output-json pipeline_results.json</code>
+    <input type="file" id="file-input" accept=".json" style="display:none">
+  </div>
+
+  <!-- Dashboard (hidden until data loaded) -->
+  <div id="dashboard" class="hidden">
+
+    <!-- Stats -->
+    <div class="stats" id="stats-row"></div>
+
+    <!-- Charts + Details -->
+    <div class="grid">
+      <div style="display:flex;flex-direction:column;gap:16px">
+
+        <!-- Colour Bar Chart -->
+        <div class="panel">
+          <div class="panel-title">◈ BIRDS BY COLOUR</div>
+          <canvas id="color-chart" height="200"></canvas>
+        </div>
+
+        <!-- Per-image timeline -->
+        <div class="panel">
+          <div class="panel-title">◈ BIRDS PER IMAGE</div>
+          <canvas id="timeline-chart" height="160"></canvas>
+        </div>
+
+      </div>
+
+      <div style="display:flex;flex-direction:column;gap:16px">
+
+        <!-- Colour breakdown list -->
+        <div class="panel">
+          <div class="panel-title">◈ COLOUR TOTALS</div>
+          <div id="color-list"></div>
+        </div>
+
+        <!-- Summary info -->
+        <div class="panel">
+          <div class="panel-title">◈ PIPELINE INFO</div>
+          <div id="info-panel" style="font-family:'DM Mono',monospace;font-size:11px"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Detections Table -->
+    <div class="panel">
+      <div class="panel-title">◈ ALL DETECTIONS — <span id="det-count"></span> birds</div>
+      <div class="table-header">
+        <span>Image</span><span>Birds</span><span>Black</span><span>Top Colour</span><span>Conf</span>
+      </div>
+      <div class="table-body" id="det-table"></div>
+    </div>
+
+  </div>
+</div>
+
+<div class="footer">AERO-WATCH v2.0 · Offline Pipeline Dashboard</div>
+
+<script>
+const COLOR_HEX = {
+  black:'#2d2d44', white:'#d4d4d4', brown:'#a0522d', green:'#3cb371',
+  red:'#dc3545', blue:'#4a90d9', yellow:'#daa520', grey:'#808080',
+  mixed:'#9b59b6', unknown:'#555555'
+};
+
+// File input + drag & drop
+const zone = document.getElementById('upload-zone');
+const fileInput = document.getElementById('file-input');
+
+fileInput.addEventListener('change', e => {
+  if (e.target.files[0]) loadFile(e.target.files[0]);
+});
+zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('active'); });
+zone.addEventListener('dragleave', () => zone.classList.remove('active'));
+zone.addEventListener('drop', e => {
+  e.preventDefault(); zone.classList.remove('active');
+  if (e.dataTransfer.files[0]) loadFile(e.dataTransfer.files[0]);
+});
+
+function loadFile(file) {
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      const data = JSON.parse(e.target.result);
+      renderDashboard(data);
+    } catch(err) {
+      alert('Invalid JSON file: ' + err.message);
+    }
+  };
+  reader.readAsText(file);
+}
+
+function renderDashboard(data) {
+  document.getElementById('upload-zone').classList.add('hidden');
+  document.getElementById('dashboard').classList.remove('hidden');
+
+  const { images_processed, total_birds, total_black_birds, elapsed_seconds, color_totals, per_image } = data;
+
+  // Stats
+  const blackPct = total_birds > 0 ? ((total_black_birds/total_birds)*100).toFixed(1) : '0';
+  const ips = images_processed / Math.max(elapsed_seconds, 0.01);
+  document.getElementById('stats-row').innerHTML = `
+    ${statCard('▣ IMAGES', images_processed, `${elapsed_seconds}s total`)}
+    ${statCard('◈ TOTAL BIRDS', total_birds, `${ips.toFixed(1)} img/s`, 'var(--accent)')}
+    ${statCard('◼ BLACK BIRDS', total_black_birds, `${blackPct}% of total`, total_black_birds > 0 ? 'var(--danger)' : 'var(--text)')}
+    ${statCard('◇ COLOURS', Object.keys(color_totals).length, 'distinct colours detected')}
+  `;
+
+  // Colour bar chart
+  const colorNames = Object.keys(color_totals).sort((a,b) => color_totals[b] - color_totals[a]);
+  const colorValues = colorNames.map(c => color_totals[c]);
+  const colorColors = colorNames.map(c => COLOR_HEX[c] || '#555');
+
+  new Chart(document.getElementById('color-chart'), {
+    type: 'bar',
+    data: {
+      labels: colorNames,
+      datasets: [{
+        data: colorValues,
+        backgroundColor: colorColors,
+        borderRadius: 4,
+        borderSkipped: false,
+      }]
+    },
+    options: {
+      responsive: true,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { ticks: { color: '#7a9480', font: { family: 'DM Mono', size: 11 } }, grid: { color: '#1e2e24' } },
+        y: { ticks: { color: '#3d5443', font: { family: 'DM Mono', size: 10 } }, grid: { color: '#1e2e24' } }
+      }
+    }
+  });
+
+  // Per-image timeline
+  const imgLabels = per_image.map((r,i) => i+1);
+  const imgBirds = per_image.map(r => r.total_birds);
+  const imgBlack = per_image.map(r => r.black_bird_count);
+
+  new Chart(document.getElementById('timeline-chart'), {
+    type: 'bar',
+    data: {
+      labels: imgLabels,
+      datasets: [
+        { label: 'All birds', data: imgBirds, backgroundColor: '#4ade8066', borderColor: '#4ade80', borderWidth: 1, borderRadius: 2 },
+        { label: 'Black birds', data: imgBlack, backgroundColor: '#ef444466', borderColor: '#ef4444', borderWidth: 1, borderRadius: 2 },
+      ]
+    },
+    options: {
+      responsive: true,
+      plugins: { legend: { labels: { color: '#7a9480', font: { family: 'DM Mono', size: 10 } } } },
+      scales: {
+        x: { title: { display: true, text: 'Image #', color: '#3d5443', font: { family: 'DM Mono', size: 10 } },
+             ticks: { color: '#3d5443', font: { family: 'DM Mono', size: 9 }, maxTicksLimit: 20 }, grid: { color: '#1e2e24' } },
+        y: { ticks: { color: '#3d5443', font: { family: 'DM Mono', size: 10 } }, grid: { color: '#1e2e24' } }
+      }
+    }
+  });
+
+  // Colour list with bars
+  const maxCount = Math.max(...colorValues, 1);
+  document.getElementById('color-list').innerHTML = colorNames.map(c => `
+    <div class="color-row">
+      <span class="dot" style="background:${COLOR_HEX[c]||'#555'}"></span>
+      <span style="width:55px;color:var(--muted)">${c}</span>
+      <div class="color-bar" style="width:${(color_totals[c]/maxCount)*100}%;background:${COLOR_HEX[c]||'#555'}"></div>
+      <span style="color:var(--text);font-weight:600;min-width:25px;text-align:right">${color_totals[c]}</span>
+    </div>
+  `).join('');
+
+  // Info panel
+  document.getElementById('info-panel').innerHTML = `
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;color:var(--muted)">
+      <span>Detector</span><span style="color:var(--text);text-align:right">YOLO26x</span>
+      <span>Classifier</span><span style="color:var(--text);text-align:right">DINOv2 ViT-S/14</span>
+      <span>Images</span><span style="color:var(--text);text-align:right">${images_processed}</span>
+      <span>Runtime</span><span style="color:var(--text);text-align:right">${elapsed_seconds}s</span>
+      <span>Speed</span><span style="color:var(--text);text-align:right">${ips.toFixed(1)} img/s</span>
+    </div>
+  `;
+
+  // Detections table
+  document.getElementById('det-count').textContent = total_birds;
+  const rows = per_image.map(r => {
+    const img = r.image_id || '—';
+    const shortImg = img.length > 35 ? '…' + img.slice(-35) : img;
+    const topColor = Object.entries(r.color_counts || {}).sort((a,b) => b[1]-a[1])[0];
+    const topColorName = topColor ? topColor[0] : '—';
+    const avgConf = r.detections && r.detections.length > 0
+      ? (r.detections.reduce((s,d) => s + d.confidence, 0) / r.detections.length)
+      : 0;
+    const confClass = avgConf > 0.8 ? 'conf-high' : avgConf > 0.6 ? 'conf-mid' : 'conf-low';
+    const isBlack = r.black_bird_count > 0;
+    return `<div class="table-row ${isBlack?'black-row':''}">
+      <span style="color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${img}">${shortImg}</span>
+      <span style="color:var(--text)">${r.total_birds}</span>
+      <span style="color:${isBlack?'var(--danger)':'var(--muted)'}">${r.black_bird_count}</span>
+      <span><span class="dot" style="background:${COLOR_HEX[topColorName]||'#555'}"></span>${topColorName}</span>
+      <span class="${confClass}" style="text-align:right">${(avgConf*100).toFixed(0)}%</span>
+    </div>`;
+  }).join('');
+  document.getElementById('det-table').innerHTML = rows;
+}
+
+function statCard(label, value, sub, color) {
+  return `<div class="stat">
+    <div class="label">${label}</div>
+    <div class="value" style="color:${color||'var(--text)'}">${value}</div>
+    <div class="sub">${sub}</div>
+  </div>`;
+}
+</script>
+</body>
+</html>

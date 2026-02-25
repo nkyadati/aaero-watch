@@ -1,0 +1,14 @@
+__pycache__/
+*.pyc
+venv/
+.env
+*.pt
+!requirements.txt
+aerowatch.db
+api_server.log
+metrics/
+*.tgz
+CUB_200_2011/
+test_images/
+test_shadow_images/
+.DS_Store
