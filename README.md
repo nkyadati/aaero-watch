@@ -39,7 +39,7 @@ The pipeline uses three models in sequence:
 
 A dedicated **shadow discriminator** prevents dark canopy shadows from being misclassified as black birds — the single largest source of false positives in equatorial forest imagery.
 
-The system runs offline on a MacBook (Apple MPS) for development and evaluation, and is production-ready for cloud deployment via Docker with GPU support, automated drift monitoring, and a CI/CD retraining pipeline.
+The system runs offline on a MacBook (Apple MPS) for development and evaluation.
 
 ---
 
@@ -123,14 +123,6 @@ The system is organised into seven layers:
 - The drift detector continuously monitors image and prediction distributions; its baseline is persisted so it doesn't need to recollect after a restart
 - When drift is critical or metrics degrade, the retrain pipeline fires automatically
 
-### Constraints & Limitations
-
-- **Bandwidth** — Satellite connectivity is expensive and intermittent. Images are JPEG-compressed at quality 85 before transmission. The system handles delayed or out-of-order arrivals using idempotent processing keyed on image hash.
-- **Power** — Solar panels limit camera operation. Capture frequency drops during overcast periods. The system tracks battery levels and adjusts expectations for coverage gaps.
-- **Latency** — End-to-end latency (camera → dashboard) is 5–30 minutes depending on satellite availability. The system is designed for near-real-time, not real-time.
-- **Environmental** — Equatorial forests present extreme challenges: dense foliage creates heavy occlusion, green-dominant canopy confuses standard white balance, frequent fog and rain degrade image quality, and shadows under the canopy mimic dark-coloured birds.
-- **Accuracy vs Speed** — The PoC prioritises detection accuracy (especially for endangered black birds) over raw throughput, using YOLO26x (the largest variant) with native small-object improvements (ProgLoss + STAL).
-- **No ground truth** — No labelled dataset exists for equatorial African species. The system must work from Day 1 with zero labels and improve via active learning. Drift detection is designed to operate without ground truth.
 
 ### PoC vs Production — What Runs vs What's Described
 
@@ -354,7 +346,7 @@ No labelled dataset exists for equatorial African bird species. CUB-200 covers N
 
 ### Four-Phase Solution
 
-**Phase 0 — Zero-Shot Bootstrap (Day 1, no labels)**
+**Phase 0 — Zero-Shot Bootstrap**
 
 Deploy immediately using foundation models that generalise without training:
 - **YOLO26:** COCO-pretrained — bird silhouettes are universal across geographies
@@ -363,7 +355,7 @@ Deploy immediately using foundation models that generalise without training:
 
 This gives a working system from the first camera frame with reasonable accuracy.
 
-**Phase 1 — Transfer Learning from Public Datasets (Week 1–2)**
+**Phase 1 — Transfer Learning from Public Datasets**
 
 Train on progressively larger public datasets:
 
@@ -376,44 +368,10 @@ Train on progressively larger public datasets:
 
 All datasets are normalised to COCO format via `DatasetConverter`. With DINOv2's frozen backbone, adding more training data only retrains the linear head — minutes, not hours.
 
-*Implementation: `src/data/cold_start_strategy.py` → `DatasetConverter`*
+**Phase 2 — Active Learning Loop (To be implemented)**
 
-**Phase 2 — Active Learning Loop (Week 1+, ongoing)**
+**Phase 3 — Synthetic Data Augmentation (To be implemented)**
 
-The critical piece that turns deployment into continuous improvement:
-
-```
-Camera frames → API (/detect) → saves to Postgres
-                    │
-              Low confidence (< 0.6)?
-                    │
-                    ▼
-              Label Studio queue
-              (ornithologist sees crop with pre-filled prediction)
-              (corrects colour label if wrong)
-                    │
-                    ▼
-              Corrected labels → S3
-                    │
-                    ▼
-              Weekly retrain picks them up
-```
-
-The `ActiveLearningSelector` scores detections by uncertainty (1 − confidence). Low-confidence crops are exported to Label Studio with pre-filled bounding boxes and colour predictions. The ornithologist only needs to confirm or correct — not draw boxes from scratch. Even 200–500 corrected crops from actual cameras dramatically improve accuracy because they match the exact distribution the model will see.
-
-*Implementation: `src/data/cold_start_strategy.py` → `ActiveLearningSelector`*
-
-**Phase 3 — Synthetic Data Augmentation (parallel)**
-
-The `SyntheticDataGenerator` fills gaps in rare classes:
-- Composites bird cutouts onto real forest backgrounds from the camera feed
-- Random scale, rotation, position with colour-matching to local brightness
-- Soft drop shadows for realism
-- Auto-generates COCO annotations
-
-Use case: only 5 black birds seen in the wild → generate 500 synthetic black bird images → mix at 1:3 synthetic-to-real ratio → retrain. Especially valuable for the endangered black bird class where real examples are extremely rare.
-
-*Implementation: `src/data/cold_start_strategy.py` → `SyntheticDataGenerator`*
 
 ### Ideal Infrastructure for Data Management
 
@@ -695,5 +653,3 @@ python3 evaluate_cub200.py --dataset-dir ./CUB_200_2011 \
 See `MAC_SETUP_GUIDE.md` for detailed setup instructions.
 
 ---
-
-*This solution addresses all required deliverables: end-to-end system architecture, model and framework justification, detection/counting/classification logic, scaling strategy, data strategy for zero-label cold start, containerisation and deployment, drift tracking across seasons, and the complete retraining/evaluation/deployment pipeline.*
